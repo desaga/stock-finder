@@ -42,25 +42,31 @@ def check_cci_rise(data, ticker):
     cci_min = cci_last_20.min()  # Find the minimum CCI value in the last 20 days
     cci_end = cci_last_20.iloc[-1]  # Find the CCI value at the end of the period
 
-    was_below_minus_100 = cci_min < -100  # Check if CCI was below -100
+    was_below_minus_100 = cci_min < -90  # Check if CCI was below -100
     is_above_plus_100_at_end = cci_end > 100  # Check if CCI is above +100 at the end
 
     if was_below_minus_100 and is_above_plus_100_at_end:
-        print(f"{ticker} passed CCI filter: CCI min = {cci_min}, CCI end = {cci_end}")
-        return True
-    return False
+        return True, cci_min, cci_end
+    return False, cci_min, cci_end
 
 # Function to check for SMA crossover in the last 5 days
 def check_sma_crossover(data, ticker):
-    for i in range(-5, 0):  # Check the last 5 days
+    for i in range(-10, 0):  # Check the last 10 days
         if data['SMA20'].iloc[i] > data['SMA200'].iloc[i] and data['SMA20'].iloc[i-1] <= data['SMA200'].iloc[i-1]:
-            print(f"{ticker} passed SMA filter: SMA20 crossed above SMA200 in the last 5 days")
             return True
+    return False
+
+# Function to check volume and price conditions
+def check_volume_and_price(data):
+    avg_volume = data['Volume'].mean()
+    last_price = data['Close'].iloc[-1]
+    if avg_volume > 1000000 and last_price > 5:
+        return True
     return False
 
 # Function to search stocks
 def search_stocks(tickers, start_date, end_date):
-    selected_stocks = []
+    results = []
     for ticker in tqdm(tickers, desc="Processing tickers"):  # Add progress bar to loop
         data = fetch_stock_data(ticker, start_date, end_date)
         if not data.empty:
@@ -68,16 +74,33 @@ def search_stocks(tickers, start_date, end_date):
             if len(data) < 200:
                 continue
 
+            # Apply volume and price filters
+            if not check_volume_and_price(data):
+                continue
+
             # Apply SMA and CCI indicators
             data = apply_indicators(data)
 
             # Check CCI filter first
-            if check_cci_rise(data, ticker):
+            cci_passed, cci_min, cci_end = check_cci_rise(data, ticker)
+            if cci_passed:
                 # If CCI filter passes, check for SMA crossover
                 if check_sma_crossover(data, ticker):
-                    selected_stocks.append(ticker)
+                    last_price = data['Close'].iloc[-1]
+                    sma20 = data['SMA20'].iloc[-1]
+                    sma200 = data['SMA200'].iloc[-1]
+                    results.append({
+                        'Ticker': ticker,
+                        'Last Price': last_price,
+                        'CCI Min': cci_min,
+                        'CCI Last': cci_end,
+                        'SMA20': sma20,
+                        'SMA200': sma200
+                    })
+                    # Print the ticker and relevant data below the progress bar
+                    tqdm.write(f"Found: {ticker} - Last Price: {last_price}, CCI Min: {cci_min}, CCI Last: {cci_end}, SMA20: {sma20}, SMA200: {sma200}")
 
-    return selected_stocks
+    return results
 
 # Fetching NYSE tickers using investpy
 try:
@@ -91,8 +114,14 @@ try:
     end_date = datetime.now().strftime('%Y-%m-%d')
 
     # Search stocks with the defined SMA and CCI criteria
-    selected_stocks = search_stocks(nyse_tickers, start_date, end_date)
+    results = search_stocks(nyse_tickers, start_date, end_date)
 
-    print(f"Stocks meeting the SMA crossover and CCI rise criteria: {selected_stocks}")
+    # Convert results to DataFrame
+    df_results = pd.DataFrame(results)
+
+    # Save results to CSV
+    df_results.to_csv('stock_analysis_results.csv', index=False)
+
+    print(f"Stocks meeting the criteria have been saved to 'stock_analysis_results.csv'")
 except Exception as e:
     print(f"Error fetching NYSE tickers: {e}")
