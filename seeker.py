@@ -123,7 +123,7 @@ def analyze_stocks(tickers, start_date, end_date, config):
     Analyzes stocks based on defined criteria.
     """
     results = []
-    for ticker in tqdm(tickers, desc="Analyzing...", ncols=10, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
+    for ticker in tqdm(tickers, desc="Analyzing...", ncols=35, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
         logging.info(f"Processing {ticker}")
         data = fetch_stock_data(ticker, start_date, end_date)
         if data.empty:
