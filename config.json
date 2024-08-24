@@ -1,0 +1,8 @@
+{
+    "days_before": 10,
+    "price_threshold": 5,
+    "volume_threshold": 1000000,
+    "cci_window": 20,
+    "sma20_window": 20,
+    "sma200_window": 200
+}
